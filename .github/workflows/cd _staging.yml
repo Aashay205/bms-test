@@ -1,19 +1,32 @@
-name : Deploy to staging 
-on : 
-  push : 
-    branches : 
-      - "main"
+name: Deploy to staging
+
+on:
+  push:
+    branches:
+      - main
 
 jobs:
-   uses : ubuntu-latest
-   redeploy_everything:
-      name : Redeploy everything
-      steps:
-          - name :ssh into server
-          - run : |
-              echo {{ secrets.SSD_PRIVATE_KEY }} &> ~/.ssh/id_rsa
-              chmod 600 ~/.ssh/id_rsa
-              ssh -i  ~/.ssh/id_rsa ubuntu@ec2-54-85-135-51.compute-1.amazonaws.com
-              cd bms_test && git pull
-              pnpm install
-              pm2 restart all
+  redeploy_everything:
+    runs-on: ubuntu-latest
+    name: Redeploy everything
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ec2-54-85-135-51.compute-1.amazonaws.com >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        run: |
+          ssh ubuntu@ec2-54-85-135-51.compute-1.amazonaws.com << 'EOF'
+            cd bms-test
+            git pull origin main
+            pnpm install
+            pnpm run build
+            pm2 restart all
+          EOF
